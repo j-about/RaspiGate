@@ -1,0 +1,41 @@
+- name: Configure Static IP on eth0
+  community.general.nmcli:
+    conn_name: eth0
+    ifname: eth0
+    type: ethernet
+    method4: manual
+    ip4: "{{ RPI_STATIC_IP }}/{{ CIDR }}"
+    gw4: "{{ GATEWAY }}"
+    dns4:
+      - "{{ GATEWAY }}"
+    autoconnect: yes
+    state: present
+
+- name: Persistently enable IPv4 forwarding
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    state: present
+    reload: yes
+    sysctl_file: /etc/sysctl.d/10-ip-forward.conf
+
+- name: Deploy Macvlan configuration script
+  copy:
+    dest: /usr/local/bin/reboot.sh
+    mode: "0755"
+    content: |
+      #!/bin/bash
+      ip link add macvlan0 link eth0 type macvlan mode bridge
+      ip addr add {{ RPI_MACVLAN_STATIC_IP }}/{{ CIDR }} dev macvlan0
+      ip link set macvlan0 up
+
+- name: Schedule Macvlan configuration script at reboot via cron
+  cron:
+    name: "Reconfigure Macvlan configuration script on reboot"
+    special_time: reboot
+    job: "/usr/local/bin/reboot.sh"
+
+- name: Reboot the Raspberry Pi to apply all network changes
+  shell: "sleep 5 && reboot"
+  async: 1
+  poll: 0

@@ -1,0 +1,48 @@
+- name: Check if /opt/raspigate directory exists
+  stat:
+    path: /opt/raspigate
+  register: raspigate_dir
+
+- name: Teardown existing Docker Compose stack
+  community.docker.docker_compose_v2:
+    project_src: /opt/raspigate
+    files:
+      - compose.yaml
+    state: absent
+  when: raspigate_dir.stat.exists
+
+- name: Create /opt/raspigate directory
+  become: true
+  file:
+    path: "/opt/raspigate"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+
+- name: Sync configuration files
+  ansible.posix.synchronize:
+    src: "../../../{{ item }}"
+    dest: "/opt/raspigate/"
+  loop:
+    - .env
+    - compose.yaml
+
+- name: Sync configuration files and project services
+  ansible.posix.synchronize:
+    src: "../{{ item }}"
+    dest: "/opt/raspigate/"
+    recursive: yes
+  loop:
+    - vpn-client
+    - vpn-server-via-vpn-client
+    - vpn-server-via-isp
+    - vpn-server-local
+
+- name: Deploy RaspiGate with Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: "/opt/raspigate"
+    files:
+      - compose.yaml
+    pull: always
+    state: present

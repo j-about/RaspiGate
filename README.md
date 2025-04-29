@@ -229,5 +229,5 @@ cp .env.example .env # Copy the example environment file
 Place all your <code>.ovpn</code> configuration files into the <code>vpn-client/configs</code> directory. Each file represents a VPN connection you want to use.
 
 ```bash
-ansible-playbook -i inventory.yaml playbook.yaml # Run the Ansible playbook
+ansible-playbook playbooks/*.yaml # Run the Ansible playbooks
 ```

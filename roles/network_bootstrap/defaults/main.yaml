@@ -1,0 +1,8 @@
+---
+RPI_IP: "{{ lookup('env','RPI_IP') }}"
+RPI_STATIC_IP: "{{ lookup('env','RPI_STATIC_IP') }}"
+CIDR: "{{ lookup('env','CIDR') }}"
+GATEWAY: "{{ lookup('env','GATEWAY') }}"
+NETWORK: "{{ lookup('env','NETWORK') }}"
+NETMASK: "{{ lookup('env','NETMASK') }}"
+RPI_MACVLAN_STATIC_IP: "{{ lookup('env','RPI_MACVLAN_STATIC_IP') }}"

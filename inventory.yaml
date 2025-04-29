@@ -1,6 +1,6 @@
 all:
   hosts:
     raspberry:
-      ansible_host: "{{ lookup('env', 'RPI_IP') }}"
+      ansible_host: "{{ lookup('env', 'RPI_STATIC_IP') }}"
       ansible_user: "{{ lookup('env', 'RPI_USER') }}"
       ansible_ssh_private_key_file: "{{ lookup('env', 'RPI_SSH_PRIVATE_KEY_FILE') }}"

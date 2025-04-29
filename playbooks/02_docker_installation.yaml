@@ -1,0 +1,7 @@
+---
+- name: Docker Installation
+  hosts: raspberry
+  become: true
+
+  roles:
+    - role: docker_installation

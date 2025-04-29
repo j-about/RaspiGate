@@ -1,0 +1,7 @@
+---
+- name: RaspiGate Deployment
+  hosts: raspberry
+  become: true
+
+  roles:
+    - role: raspigate_deployment

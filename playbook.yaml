@@ -1,0 +1,179 @@
+---
+- name: Deploy RaspiGate
+  hosts: raspberry
+  become: True
+  vars:
+    RPI_STATIC_IP: "{{ lookup('env', 'RPI_STATIC_IP') }}"
+    CIDR: "{{ lookup('env', 'CIDR') }}"
+    GATEWAY: "{{ lookup('env', 'GATEWAY') }}"
+    NETWORK: "{{ lookup('env', 'NETWORK') }}"
+    NETMASK: "{{ lookup('env', 'NETMASK') }}"
+    RPI_MACVLAN_STATIC_IP: "{{ lookup('env', 'RPI_MACVLAN_STATIC_IP') }}"
+
+  pre_tasks:
+    - name: Verify environment variables
+      assert:
+        that:
+          - RPI_STATIC_IP != ""
+          - CIDR != ""
+          - GATEWAY != ""
+          - NETWORK != ""
+          - NETMASK != ""
+          - RPI_MACVLAN_STATIC_IP != ""
+        fail_msg: "Required environment variables are not set"
+
+  tasks:
+    - name: Configure static IP on eth0 via NetworkManager
+      community.general.nmcli:
+        conn_name: eth0
+        ifname: eth0
+        type: ethernet
+        method4: manual
+        ip4: "{{ RPI_STATIC_IP }}/{{ CIDR }}"
+        gw4: "{{ GATEWAY }}"
+        dns4:
+          - "{{ GATEWAY }}"
+        autoconnect: yes
+        state: present
+
+    - name: Enable IPv4 forwarding persistently
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        state: present
+        reload: yes
+        sysctl_file: /etc/sysctl.d/10-ip-forward.conf
+
+    - name: Create reboot script
+      copy:
+        dest: /usr/local/bin/reboot.sh
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          ip link add macvlan0 link eth0 type macvlan mode bridge
+          ip addr add {{ RPI_MACVLAN_STATIC_IP }}/{{ CIDR }} dev macvlan0
+          ip link set macvlan0 up
+
+    - name: Add reboot script to crontab
+      cron:
+        name: "Execute network configuration on reboot"
+        special_time: reboot
+        job: "/usr/local/bin/reboot.sh"
+
+    - name: Reboot the Raspberry Pi to apply all changes
+      ansible.builtin.reboot:
+        reboot_timeout: 300
+        pre_reboot_delay: 5
+        post_reboot_delay: 10
+
+    - name: Check if Docker is installed
+      command: docker --version
+      register: docker_check
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Setup Docker
+      become: true
+      when: docker_check.rc != 0
+      block:
+        - name: Install prerequisites
+          apt:
+            name:
+              - ca-certificates
+              - curl
+            state: present
+            update_cache: yes
+
+        - name: Create keyrings directory
+          file:
+            path: /etc/apt/keyrings
+            state: directory
+            mode: "0755"
+
+        - name: Download Docker's GPG key
+          get_url:
+            url: https://download.docker.com/linux/debian/gpg
+            dest: /etc/apt/keyrings/docker.asc
+            mode: "0644"
+
+        - name: Set up Docker repository
+          shell: |
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+        - name: Install Docker packages
+          apt:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+              - docker-buildx-plugin
+              - docker-compose-plugin
+            state: present
+            update_cache: yes
+
+        - name: Ensure Docker group exists
+          group:
+            name: docker
+            state: present
+
+        - name: Add user to Docker group
+          user:
+            name: "{{ ansible_user }}"
+            groups: docker
+            append: yes
+
+        - name: Reboot the Raspberry Pi to apply all changes
+          ansible.builtin.reboot:
+            reboot_timeout: 300
+            pre_reboot_delay: 5
+            post_reboot_delay: 10
+
+    - name: Check if project directory exists
+      stat:
+        path: /opt/raspigate
+      register: raspigate_dir
+
+    - name: Teardown existing Docker Compose stack
+      community.docker.docker_compose_v2:
+        project_src: /opt/raspigate
+        files:
+          - compose.yaml
+        state: absent
+      when: raspigate_dir.stat.exists
+
+    - name: Create project directory
+      become: true
+      file:
+        path: "/opt/raspigate"
+        state: directory
+        mode: "0755"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: Copy configuration files
+      copy:
+        src: "{{ item }}"
+        dest: "/opt/raspigate/"
+        mode: "0644"
+      loop:
+        - .env
+        - compose.yaml
+
+    - name: Copy project directories
+      ansible.posix.synchronize:
+        src: "{{ item }}"
+        dest: "/opt/raspigate/"
+        recursive: yes
+      loop:
+        - vpn-client
+        - vpn-server-via-vpn-client
+        - vpn-server-via-isp
+        - vpn-server-local
+
+    - name: Deploy with docker compose
+      community.docker.docker_compose_v2:
+        project_src: "/opt/raspigate"
+        files:
+          - compose.yaml
+        pull: always
+        state: present

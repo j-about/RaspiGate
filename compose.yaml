@@ -1,0 +1,160 @@
+services:
+  adguardhome:
+    image: adguard/adguardhome
+    container_name: adguardhome
+    networks:
+      raspigate-network:
+        ipv4_address: ${ADGUARD_STATIC_IP}
+    volumes:
+      - ./adguardhome/work:/opt/adguardhome/work
+      - ./adguardhome/conf:/opt/adguardhome/conf
+    restart: unless-stopped
+  vpn-client:
+    build: ./vpn-client
+    container_name: vpn-client
+    networks:
+      raspigate-network:
+        ipv4_address: ${VPN_CLIENT_STATIC_IP}
+    devices:
+      - "/dev/net/tun"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./vpn-client/configs:/opt/vpn-client/configs
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv6.conf.all.disable_ipv6: "1"
+      net.ipv6.conf.default.disable_ipv6: "1"
+      net.ipv6.conf.lo.disable_ipv6: "1"
+    dns:
+      - ${VPN_CLIENT_DNS_1}
+      - ${VPN_CLIENT_DNS_2}
+    environment:
+      - VPN_USERNAME=${VPN_USERNAME}
+      - VPN_PASSWORD=${VPN_PASSWORD}
+    restart: unless-stopped
+  vpn-server-via-vpn-client:
+    build: ./vpn-server-via-vpn-client
+    container_name: vpn-server-via-vpn-client
+    networks:
+      raspigate-network:
+        ipv4_address: ${VPN_SERVER_VVC_STATIC_IP}
+    devices:
+      - "/dev/net/tun"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./vpn-server-via-vpn-client/conf:/opt/vpn-server-via-vpn-client/conf
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv6.conf.all.disable_ipv6: "1"
+      net.ipv6.conf.default.disable_ipv6: "1"
+      net.ipv6.conf.lo.disable_ipv6: "1"
+    dns:
+      - ${VPN_CLIENT_DNS_1}
+      - ${VPN_CLIENT_DNS_2}
+    environment:
+      - EASYRSA_REQ_CN=${EASYRSA_REQ_CN}
+      - VPN_SERVER_VVC_EASYRSA_SERVER_NAME=${VPN_SERVER_VVC_EASYRSA_SERVER_NAME}
+      - EASYRSA_CLIENT_NAME=${EASYRSA_CLIENT_NAME}
+      - VPN_SERVER_VVC_STATIC_IP=${VPN_SERVER_VVC_STATIC_IP}
+      - VPN_SERVER_VVC_PORT=${VPN_SERVER_VVC_PORT}
+      - VPN_SERVER_VVC_PROTOCOL=${VPN_SERVER_VVC_PROTOCOL}
+      - VPN_SERVER_VVC_NETWORK=${VPN_SERVER_VVC_NETWORK}
+      - VPN_SERVER_VVC_NETMASK=${VPN_SERVER_VVC_NETMASK}
+      - NETWORK=${NETWORK}
+      - NETMASK=${NETMASK}
+      - VPN_CLIENT_DNS_1=${VPN_CLIENT_DNS_1}
+      - VPN_CLIENT_DNS_2=${VPN_CLIENT_DNS_2}
+      - VPN_SERVER_VVC_HOST=${VPN_SERVER_VVC_HOST}
+      - VPN_CLIENT_STATIC_IP=${VPN_CLIENT_STATIC_IP}
+    restart: unless-stopped
+    depends_on:
+      - vpn-client
+  vpn-server-via-isp:
+    build: ./vpn-server-via-isp
+    container_name: vpn-server-via-isp
+    networks:
+      raspigate-network:
+        ipv4_address: ${VPN_SERVER_VISP_STATIC_IP}
+    devices:
+      - "/dev/net/tun"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./vpn-server-via-isp/conf:/opt/vpn-server-via-isp/conf
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv6.conf.all.disable_ipv6: "1"
+      net.ipv6.conf.default.disable_ipv6: "1"
+      net.ipv6.conf.lo.disable_ipv6: "1"
+    dns:
+      - ${ADGUARD_STATIC_IP}
+    environment:
+      - EASYRSA_REQ_CN=${EASYRSA_REQ_CN}
+      - VPN_SERVER_VISP_EASYRSA_SERVER_NAME=${VPN_SERVER_VISP_EASYRSA_SERVER_NAME}
+      - EASYRSA_CLIENT_NAME=${EASYRSA_CLIENT_NAME}
+      - VPN_SERVER_VISP_STATIC_IP=${VPN_SERVER_VISP_STATIC_IP}
+      - VPN_SERVER_VISP_PORT=${VPN_SERVER_VISP_PORT}
+      - VPN_SERVER_VISP_PROTOCOL=${VPN_SERVER_VISP_PROTOCOL}
+      - VPN_SERVER_VISP_NETWORK=${VPN_SERVER_VISP_NETWORK}
+      - VPN_SERVER_VISP_NETMASK=${VPN_SERVER_VISP_NETMASK}
+      - NETWORK=${NETWORK}
+      - NETMASK=${NETMASK}
+      - ADGUARD_STATIC_IP=${ADGUARD_STATIC_IP}
+      - VPN_SERVER_VISP_HOST=${VPN_SERVER_VISP_HOST}
+    restart: unless-stopped
+    depends_on:
+      - adguardhome
+  vpn-server-local:
+    build: ./vpn-server-local
+    container_name: vpn-server-local
+    networks:
+      raspigate-network:
+        ipv4_address: ${VPN_SERVER_LOCAL_STATIC_IP}
+    devices:
+      - "/dev/net/tun"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./vpn-server-local/conf:/opt/vpn-server-local/conf
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv6.conf.all.disable_ipv6: "1"
+      net.ipv6.conf.default.disable_ipv6: "1"
+      net.ipv6.conf.lo.disable_ipv6: "1"
+    dns:
+      - ${ADGUARD_STATIC_IP}
+    environment:
+      - EASYRSA_REQ_CN=${EASYRSA_REQ_CN}
+      - VPN_SERVER_LOCAL_EASYRSA_SERVER_NAME=${VPN_SERVER_LOCAL_EASYRSA_SERVER_NAME}
+      - EASYRSA_CLIENT_NAME=${EASYRSA_CLIENT_NAME}
+      - VPN_SERVER_LOCAL_STATIC_IP=${VPN_SERVER_LOCAL_STATIC_IP}
+      - VPN_SERVER_LOCAL_PORT=${VPN_SERVER_LOCAL_PORT}
+      - VPN_SERVER_LOCAL_PROTOCOL=${VPN_SERVER_LOCAL_PROTOCOL}
+      - VPN_SERVER_LOCAL_NETWORK=${VPN_SERVER_LOCAL_NETWORK}
+      - VPN_SERVER_LOCAL_NETMASK=${VPN_SERVER_LOCAL_NETMASK}
+      - NETWORK=${NETWORK}
+      - NETMASK=${NETMASK}
+      - ADGUARD_STATIC_IP=${ADGUARD_STATIC_IP}
+      - VPN_SERVER_LOCAL_HOST=${VPN_SERVER_LOCAL_HOST}
+    restart: unless-stopped
+    depends_on:
+      - adguardhome
+networks:
+  raspigate-network:
+    driver: macvlan
+    driver_opts:
+      parent: eth0
+    ipam:
+      config:
+        - subnet: ${NETWORK}/${CIDR}
+          gateway: ${GATEWAY}

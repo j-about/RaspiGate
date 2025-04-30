@@ -1,6 +1,7 @@
 ---
 - name: Network Bootstrap for Raspberry Pi
   hosts: raspberry
+  ignore_unreachable: true
   become: true
   vars_files:
     - roles/network_bootstrap/defaults/main.yml
@@ -20,15 +21,6 @@
     - name: Update Ansible Host IP
       ansible.builtin.set_fact:
         ansible_host: "{{ RPI_IP }}"
-
-  post_tasks:
-    - name: Update Ansible Host IP
-      ansible.builtin.set_fact:
-        ansible_host: "{{ RPI_STATIC_IP }}"
-    - name: Wait for SSH connection
-      ansible.builtin.wait_for_connection:
-        delay: 10
-        timeout: 300
 
   roles:
     - role: network_bootstrap

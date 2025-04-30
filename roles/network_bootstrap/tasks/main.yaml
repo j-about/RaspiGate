@@ -10,6 +10,19 @@
       - "{{ GATEWAY }}"
     autoconnect: yes
     state: present
+  async: 1
+  poll: 0
+
+- name: Update Ansible Host IP
+  ansible.builtin.set_fact:
+    ansible_host: "{{ RPI_STATIC_IP }}"
+
+- ansible.builtin.meta: clear_host_errors
+
+- name: Wait for SSH connection
+  ansible.builtin.wait_for_connection:
+    delay: 5
+    timeout: 300
 
 - name: Persistently enable IPv4 forwarding
   ansible.posix.sysctl:
@@ -36,6 +49,7 @@
     job: "/usr/local/bin/reboot.sh"
 
 - name: Reboot the Raspberry Pi to apply all network changes
-  shell: "sleep 5 && reboot"
-  async: 1
-  poll: 0
+  ansible.builtin.reboot:
+    reboot_timeout: 300
+    pre_reboot_delay: 5
+    post_reboot_delay: 10

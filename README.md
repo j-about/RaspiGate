@@ -204,7 +204,7 @@ cp .env.example .env # Copy the example environment file
         <tr>
             <td><code>VPN_SERVER_LOCAL_PROTOCOL</code></td>
             <td>Protocol for VPN server for local network access only.</td>
-            <td><code>tcp</code></td>
+            <td><code>udp</code></td>
         </tr>
         <tr>
             <td><code>VPN_SERVER_LOCAL_HOST</code></td>
